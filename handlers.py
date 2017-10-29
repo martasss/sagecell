@@ -341,6 +341,12 @@ class ServiceHandler(tornado.web.RequestHandler):
             return
         remote_ip = self.request.remote_ip
         referer = self.request.headers.get('Referer', '')
+        self.id = yield tornado.gen.Task(
+            self.application.kernel_dealer.get_kernel,
+            resource_limits=config.get_config("provider_settings")["resource_limits"],
+            referer=referer,
+            remote_ip=remote_ip,
+            timeout=0)
         self.kernel_id = yield tornado.gen.Task(
             self.application.km.new_session_async,
             referer=referer,

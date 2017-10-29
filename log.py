@@ -24,6 +24,7 @@ stats_logger = logger.getChild("stats")
 # Intermediate loggers to be parents for actual receivers and kernels.
 receiver_logger = logger.getChild("receiver")
 kernel_logger = logger.getChild("kernel")
+provider_logger = logger.getChild("provider")
 
 root = logging.getLogger()
 root.addHandler(syslog)

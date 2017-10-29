@@ -18,6 +18,7 @@ import misc
 import handlers
 import permalink
 from trusted_kernel_manager import TrustedMultiKernelManager
+from kernel_dealer import KernelDealer
 
 
 class SageCellServer(tornado.web.Application):
@@ -28,12 +29,16 @@ class SageCellServer(tornado.web.Application):
         baseurl = baseurl.rstrip('/')
         handlers_list = [
             (r"/", handlers.RootHandler),
-            (r"/embedded_sagecell.js", tornado.web.RedirectHandler, {"url":baseurl+"/static/embedded_sagecell.js"}),
+            (r"/embedded_sagecell.js",
+             tornado.web.RedirectHandler,
+             {"url":baseurl+"/static/embedded_sagecell.js"}),
             (r"/help.html", handlers.HelpHandler),
             (r"/kernel", handlers.KernelHandler),
             (r"/kernel/%s" % _kernel_id_regex, handlers.KernelHandler),
-            (r"/kernel/%s/channels" % _kernel_id_regex, handlers.WebChannelsHandler),
-            (r"/kernel/%s/files/(?P<file_path>.*)" % _kernel_id_regex, handlers.FileHandler, {"path": tmp_dir}),
+            (r"/kernel/%s/channels" % _kernel_id_regex,
+             handlers.WebChannelsHandler),
+            (r"/kernel/%s/files/(?P<file_path>.*)" % _kernel_id_regex,
+             handlers.FileHandler, {"path": tmp_dir}),
             (r"/permalink", permalink.PermalinkHandler),
             (r"/service", handlers.ServiceHandler),
             (r"/tos.html", handlers.TOSHandler),
@@ -41,14 +46,20 @@ class SageCellServer(tornado.web.Application):
         handlers_list = [[baseurl+i[0]]+list(i[1:]) for i in handlers_list]
         settings = dict(
             compress_response = True,
-            template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
-            static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static"),
-            static_url_prefix = baseurl+"/static/",
+            template_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "templates"),
+            static_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "static"),
+            static_url_prefix = baseurl + "/static/",
             static_handler_class = handlers.StaticHandler
             )
         self.km = TrustedMultiKernelManager(
             computers=self.config.get_config("computers"),
             tmp_dir=tmp_dir)
+        self.kernel_dealer = KernelDealer(
+            self.config.get_config("provider_settings"))
+        self.kernel_dealer.start_providers(
+            self.config.get_config("providers"), tmp_dir)
         db = __import__('db_'+self.config.get_config('db'))
         self.db = db.DB(self.config.get_config('db_config')['uri'])
         self.ioloop = zmq.eventloop.IOLoop.instance()
@@ -129,6 +140,7 @@ if __name__ == "__main__":
     def handler(signum, frame):
         logger.info("Received %s, shutting down...", signum)
         application.km.shutdown()
+        application.kernel_dealer.stop()
         application.ioloop.stop()
     
     signal.signal(signal.SIGHUP, handler)
